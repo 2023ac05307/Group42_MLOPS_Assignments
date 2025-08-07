@@ -1,0 +1,12 @@
+ipykernel
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+flask
+fastapi
+uvicorn
+mlflow
+psutil
+numpy

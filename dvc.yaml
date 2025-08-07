@@ -1,0 +1,9 @@
+stages:
+  train:
+    cmd: python train.py
+    deps:
+      - data/housing.csv
+      - train.py
+    outs:
+      - models/linear_regression_model.joblib
+      - models/decision_tree_model.joblib
