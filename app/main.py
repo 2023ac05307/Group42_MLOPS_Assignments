@@ -8,6 +8,11 @@ import pandas as pd
 # Import from src.inference
 from src.inference import get_production_model, predict_price
 
+
+LOG_FILE_PATH = "logs/predictions.log"
+DB_FILE_PATH = "database/prediction_logs.db"
+
+
 # Init FastAPI
 app = FastAPI(
     title="California Housing Price Predictor",
@@ -29,7 +34,7 @@ class HousingFeatures(BaseModel):
 
 # Setup logging to file
 logging.basicConfig(
-    filename="predictions.log",
+    filename=LOG_FILE_PATH,
     level=logging.INFO,
     format="%(asctime)s - %(message)s"
 )
@@ -40,7 +45,7 @@ logging.basicConfig(
 
 # Initialize SQLite DB
 def init_db():
-    conn = sqlite3.connect("prediction_logs.db")
+    conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS logs (
@@ -57,7 +62,7 @@ init_db()
 
 # Save log to SQLite
 def log_to_db(input_data: dict, prediction: float):
-    conn = sqlite3.connect("prediction_logs.db")
+    conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
     c.execute(
         "INSERT INTO logs (timestamp, input, prediction) VALUES (?, ?, ?)",
@@ -85,7 +90,7 @@ async def predict(input_data: HousingFeatures, request: Request):
 
 @app.get("/metrics")
 def metrics():
-    conn = sqlite3.connect("prediction_logs.db")
+    conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM logs")
     total_requests = c.fetchone()[0]

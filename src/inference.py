@@ -4,27 +4,6 @@ import joblib
 import os
 from mlflow.tracking import MlflowClient
 
-# def get_production_model(model_name="CaliforniaHousingModel"):
-#     mlflow.set_tracking_uri("http://localhost:5000/")
-#     client = MlflowClient()
-#     versions = client.search_model_versions(f"name='{model_name}'")
-
-#     for v in versions:
-#         tags = dict(v.tags)
-#         if tags.get("stage") == "production":
-#             # Download full artifact directory
-#             artifact_uri = v.source  # points to "runs:/<run_id>/model"
-#             model_path = mlflow.pyfunc.load_model(artifact_uri)
-
-#             # Download and load preprocessor
-#             local_artifacts = client.download_artifacts(run_id=v.run_id, path="model")
-#             preprocessor_path = os.path.join(local_artifacts, "preprocessor.pkl")
-#             preprocessor = joblib.load(preprocessor_path)
-
-#             return model_path, preprocessor
-
-#     raise Exception("No production model found.")
-
 def get_production_model(model_name="CaliforniaHousingModel"):
     mlflow.set_tracking_uri("http://localhost:5000/")
     print("MLflow tracking URI set.")
@@ -60,8 +39,8 @@ def predict_price(model, preprocessor, input_df: pd.DataFrame) -> float:
         "OceanProximity": "ocean_proximity"
     })
 
-    print("✅ Columns in input_df just before transformation:", input_df.columns.tolist())
-    print("✅ Data:\n", input_df)
+    #print("✅ Columns in input_df just before transformation:", input_df.columns.tolist())
+    #print("✅ Data:\n", input_df)
 
     transformed_input = preprocessor.transform(input_df)
     prediction = model.predict(transformed_input)

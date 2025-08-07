@@ -1,1 +1,5 @@
 /housing.csv
+.dvc
+preprocessor.pkl
+*.log
+.dvcignore
