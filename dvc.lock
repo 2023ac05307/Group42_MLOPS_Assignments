@@ -3,10 +3,10 @@ stages:
   train:
     cmd: python3.11 src/train.py
     deps:
-    - path: data/housing.csv
+    - path: s3://dvc-data-src/housing.csv
       hash: md5
-      md5: d1c47305887e2252bf1ccbd74ff159a6
-      size: 1423529
+      etag: 51eb394839887a990052252418390dda
+      size: 1423114
     - path: src/data_preprocessing.py
       hash: md5
       md5: a736170f500509bdb24c06008f108537
