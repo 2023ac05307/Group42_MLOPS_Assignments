@@ -1,0 +1,86 @@
+name: Retrain on data change in S3
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'data/**'
+      - 'dvc.lock'
+      - 'src/**'
+      - 'dvc.yaml'
+  schedule:
+    - cron: '0 2 * * *'  # 02:00 UTC daily polling
+
+permissions:
+  contents: write
+
+concurrency:
+  group: retrain-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  retrain:
+    runs-on: ec2-runner
+    env:
+      # (optional) set this in repo secrets if you want the job to talk to your MLflow server
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # If your runner uses an IAM role, you can skip these env vars.
+      - name: Configure AWS (sanity)
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: aws sts get-caller-identity
+
+      - name: Ensure Git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Pull latest DVC objects (from S3)
+        run: dvc fetch
+
+      - name: Check if pipeline needs retraining
+        id: need
+        run: |
+          # Show status against remote cache (S3). If anything is out-of-date, mark need=true
+          echo "=== DVC status (cloud) ==="
+          dvc status -c || true
+          if dvc status -c | grep -Eiq '(changed|not in cache|new|deleted)'; then
+            echo "needs_retrain=true"  >> $GITHUB_OUTPUT
+          else
+            echo "needs_retrain=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync workspace (optional)
+        if: steps.need.outputs.needs_retrain == 'true'
+        run: dvc pull
+
+      - name: Reproduce pipeline
+        if: steps.need.outputs.needs_retrain == 'true'
+        run: dvc repro
+
+      - name: Push new data/artifacts to DVC remote
+        if: steps.need.outputs.needs_retrain == 'true'
+        run: dvc push
+
+      - name: Commit & push updated lock / metrics
+        if: steps.need.outputs.needs_retrain == 'true'
+        run: |
+          git add dvc.lock
+          # add any metrics files you write (e.g., metrics.json) if applicable
+          # git add metrics.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Retrain: update dvc.lock (auto)"
+            git push
+          fi
+
+      - name: No-op log
+        if: steps.need.outputs.needs_retrain != 'true'
+        run: echo "Pipeline is up to date. No retrain required."
