@@ -2,21 +2,81 @@ name: MLOps CI/CD
 
 on:
   push:
-    branches: [main_v1]
+    branches: [ main ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  build-and-deploy:
+    runs-on: [self-hosted, Linux, X64]
+    env:
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-be
+      APP_PORT: 8000
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout
+      # v4 recommended
+        uses: actions/checkout@v4
         with:
-          python-version: 3.9
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run unit tests
-        run: pytest
-      - name: Build Docker image
-        run: docker build -t mlops-model .
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Add github.com to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+          
+      - name: Docker login (Docker Hub)
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build image
+        run: |
+          docker build -t "$IMAGE:latest" -t "$IMAGE:${{ github.sha }}" .
+
+      - name: Push image
+        run: |
+          docker push "$IMAGE:${{ github.sha }}"
+
+      # Everything below runs on the same EC2 self-hosted runner (no SSH needed)
+
+      - name: Pull on EC2 runner
+        run: docker pull "$IMAGE:${{ github.sha }}"
+
+      - name: Restart container
+        run: |
+          # stop & remove if exists
+          docker rm -f calfornia-housing-api 2>/dev/null || true
+          # run new container
+          docker run -d --name calfornia-housing-api --restart unless-stopped \
+            -p ${APP_PORT}:8000 \
+            "$IMAGE:${{ github.sha }}"
+
+      - name: Wait for app to be up
+        run: |
+          # simple warmup loop
+          for i in {1..30}; do
+            if curl -fsS "http://localhost:${APP_PORT}/" >/dev/null; then
+              echo "Calfornia Housing API is live and running as expected"; break
+            fi
+            sleep 2
+          done
+
+      - name: Print endpoints
+        id: urls
+        shell: bash
+        run: |
+          # Try EC2 public IP, fall back to localhost if unavailable
+          PUB_IP="$(curl -s --max-time 2 http://169.254.169.254/latest/meta-data/public-ipv4 || true)"
+          if [ -z "$PUB_IP" ]; then PUB_IP="localhost"; fi
+          BASE="http://${PUB_IP}:${APP_PORT}"
+          echo "BASE=$BASE" >> $GITHUB_OUTPUT
+
+          echo "Base:     ${BASE}/"
+          echo "Metrics:  ${BASE}/metrics"
+          echo "Predict:  ${BASE}/predict"
+
+          {
+            echo "## Deployed API Endpoints"
+            echo ""
+            echo "- **Base**: ${BASE}/"
+            echo "- **Metrics**: ${BASE}/metrics"
+            echo "- **Predict**: ${BASE}/predict"
+          } >> "$GITHUB_STEP_SUMMARY"
