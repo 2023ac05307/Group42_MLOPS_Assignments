@@ -3,13 +3,13 @@ name: Retrain on data change in S3
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'data/**'
-      - 'dvc.lock'
-      - 'src/**'
-      - 'dvc.yaml'
-  schedule:
-    - cron: '0 2 * * *'  # 02:00 UTC daily polling
+  #   paths:
+  #     - 'data/**'
+  #     - 'dvc.lock'
+  #     - 'src/**'
+  #     - 'dvc.yaml'
+  # schedule:
+  #   - cron: '0 2 * * *'  # 02:00 UTC daily polling
 
 permissions:
   contents: write
