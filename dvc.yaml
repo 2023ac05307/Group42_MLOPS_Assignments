@@ -1,6 +1,8 @@
 stages:
   train:
-    cmd: python src/train.py
+    cmd: python3.11 src/train.py
     deps:
       - data/housing.csv
       - src/train.py
+      - src/data_preprocessing.py
+      - src/inference.py
