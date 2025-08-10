@@ -5,7 +5,7 @@ import os
 from mlflow.tracking import MlflowClient
 
 def get_production_model(model_name="CaliforniaHousingModel"):
-    mlflow.set_tracking_uri("http://localhost:5000/")
+    mlflow.set_tracking_uri("http://ec2-44-203-72-164.compute-1.amazonaws.com:5000/")
     print("MLflow tracking URI set.")
     client = MlflowClient()
     print("MLflow client created.")
