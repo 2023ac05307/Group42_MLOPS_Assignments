@@ -1,7 +1,7 @@
 schema: '2.0'
 stages:
   train:
-    cmd: python src/train.py
+    cmd: python3.11 src/train.py
     deps:
     - path: data/housing.csv
       hash: md5
@@ -9,5 +9,5 @@ stages:
       size: 1423529
     - path: src/train.py
       hash: md5
-      md5: 8b83fd191aa8f5e6874c35819b8305ca
-      size: 4978
+      md5: 0f9ced73908ad61dc2f1781c443966e2
+      size: 4427
