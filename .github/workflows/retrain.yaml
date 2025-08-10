@@ -3,6 +3,11 @@ name: Retrain on data change in S3
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      s3_bucket: { required: false }
+      s3_key:    { required: false }
+      s3_etag:   { required: false }    
   #   paths:
   #     - 'data/**'
   #     - 'dvc.lock'
