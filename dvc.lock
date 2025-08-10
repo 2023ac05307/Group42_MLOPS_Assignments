@@ -7,7 +7,15 @@ stages:
       hash: md5
       md5: d1c47305887e2252bf1ccbd74ff159a6
       size: 1423529
+    - path: src/data_preprocessing.py
+      hash: md5
+      md5: a736170f500509bdb24c06008f108537
+      size: 1508
+    - path: src/inference.py
+      hash: md5
+      md5: 551c2ccb279c7b59354d111b6df2ab49
+      size: 1737
     - path: src/train.py
       hash: md5
-      md5: 0f9ced73908ad61dc2f1781c443966e2
-      size: 4427
+      md5: 770c22111cfd08fb5ae51aab83fea2ed
+      size: 4428
