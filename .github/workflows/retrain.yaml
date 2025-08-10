@@ -8,14 +8,6 @@ on:
       s3_bucket: { required: false }
       s3_key:    { required: false }
       s3_etag:   { required: false }    
-  #   paths:
-  #     - 'data/**'
-  #     - 'dvc.lock'
-  #     - 'src/**'
-  #     - 'dvc.yaml'
-  # schedule:
-  #   - cron: '0 2 * * *'  # 02:00 UTC daily polling
-
 jobs:
   retrain:
     runs-on: [self-hosted, Linux, X64]
@@ -23,7 +15,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
 
+      - name: Add github.com to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+          
       # If your runner uses an IAM role, you can skip these env vars.
       - name: Configure AWS (sanity)
         env:
