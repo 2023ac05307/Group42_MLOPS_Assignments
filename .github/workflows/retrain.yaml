@@ -20,7 +20,7 @@ on:
 
 jobs:
   retrain:
-    runs-on: ec2-runner
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v4
         with:
