@@ -19,3 +19,15 @@ stages:
       hash: md5
       md5: 770c22111cfd08fb5ae51aab83fea2ed
       size: 4428
+  fetch_housing:
+    cmd: aws s3 cp s3://dvc-data-src/housing.csv data/housing.csv
+    deps:
+    - path: s3://dvc-data-src/housing.csv
+      hash: md5
+      etag: 51eb394839887a990052252418390dda
+      size: 1423114
+    outs:
+    - path: data/housing.csv
+      hash: md5
+      md5: 51eb394839887a990052252418390dda
+      size: 1423114

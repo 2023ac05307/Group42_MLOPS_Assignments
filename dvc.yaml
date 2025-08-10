@@ -1,8 +1,14 @@
 stages:
+  fetch_housing:
+    cmd: aws s3 cp s3://dvc-data-src/housing.csv data/housing.csv
+    deps:
+      - s3://dvc-data-src/housing.csv
+    outs:
+      - data/housing.csv
   train:
     cmd: python3.11 src/train.py
     deps:
-      - data/housing.csv
       - src/train.py
       - src/data_preprocessing.py
       - src/inference.py
+
