@@ -16,13 +16,6 @@ on:
   # schedule:
   #   - cron: '0 2 * * *'  # 02:00 UTC daily polling
 
-# permissions:
-#   contents: write
-
-# concurrency:
-#   group: retrain-${{ github.ref }}
-#   cancel-in-progress: false
-
 jobs:
   retrain:
     runs-on: [self-hosted, Linux, X64]
@@ -51,8 +44,8 @@ jobs:
         run: |
           # Show status against remote cache (S3). If anything is out-of-date, mark need=true
           echo "=== DVC status (cloud) ==="
-          dvc status -c || true
-          if dvc status -c | grep -Eiq '(changed|not in cache|new|deleted)'; then
+          dvc status || true
+          if dvc status | grep -Eiq '(changed deps|changed|always changed|not in cache|deleted)'; then
             echo "needs_retrain=true"  >> $GITHUB_OUTPUT
           else
             echo "needs_retrain=false" >> $GITHUB_OUTPUT
