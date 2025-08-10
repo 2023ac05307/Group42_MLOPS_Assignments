@@ -46,7 +46,7 @@ def train_and_log_model(name, model, X_train, y_train, X_test, y_test,preprocess
         #     signature=mlflow.models.infer_signature(X_test, predictions)
         # )
 
-        # Log entire folder as one MLflow artifact
+        # #Log entire folder as one MLflow artifact
         #mlflow.log_artifacts("models", artifact_path="model")
 
 
