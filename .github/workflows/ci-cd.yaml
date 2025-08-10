@@ -8,7 +8,7 @@ jobs:
   build-and-deploy:
     runs-on: [self-hosted, Linux, X64]
     env:
-      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-be
+      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/fastapi-be
       APP_PORT: 8000
     steps:
       - name: Checkout
@@ -25,7 +25,7 @@ jobs:
           
       - name: Docker login (Docker Hub)
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ vars.DOCKERHUB_USERNAME }}" --password-stdin
       - name: Build image
         run: |
           docker build -t "$IMAGE:${{ github.sha }}" .
