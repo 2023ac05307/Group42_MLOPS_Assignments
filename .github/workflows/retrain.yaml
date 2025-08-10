@@ -11,21 +11,16 @@ on:
   # schedule:
   #   - cron: '0 2 * * *'  # 02:00 UTC daily polling
 
-permissions:
-  contents: write
+# permissions:
+#   contents: write
 
-concurrency:
-  group: retrain-${{ github.ref }}
-  cancel-in-progress: false
+# concurrency:
+#   group: retrain-${{ github.ref }}
+#   cancel-in-progress: false
 
 jobs:
   retrain:
     runs-on: ec2-runner
-    env:
-      # (optional) set this in repo secrets if you want the job to talk to your MLflow server
-      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-      AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
-
     steps:
       - uses: actions/checkout@v4
         with:
