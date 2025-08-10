@@ -11,4 +11,5 @@ stages:
       - src/train.py
       - src/data_preprocessing.py
       - src/inference.py
+      - s3://dvc-data-src/housing.csv
 
