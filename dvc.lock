@@ -24,10 +24,10 @@ stages:
     deps:
     - path: s3://dvc-data-src/housing.csv
       hash: md5
-      etag: 51eb394839887a990052252418390dda
-      size: 1423114
+      etag: 74900411611029955ee411fd8ad774aa
+      size: 1422976
     outs:
     - path: data/housing.csv
       hash: md5
-      md5: 51eb394839887a990052252418390dda
-      size: 1423114
+      md5: 74900411611029955ee411fd8ad774aa
+      size: 1422976
