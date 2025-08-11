@@ -1,5 +1,3 @@
-import os
-import pandas as pd
 import joblib
 import mlflow
 import mlflow.sklearn
@@ -7,16 +5,11 @@ import logging
 import numpy as np
 import psutil
 import time
-import shutil 
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from mlflow.tracking import MlflowClient
 from data_preprocessing import load_data, preprocess_data
 

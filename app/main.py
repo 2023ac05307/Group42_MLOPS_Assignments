@@ -1,7 +1,7 @@
 # app/main.py
 from fastapi import FastAPI, Request
-from pydantic import BaseModel
-import logging, sqlite3
+import logging
+import sqlite3
 from datetime import datetime
 import pandas as pd
 

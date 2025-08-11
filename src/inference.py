@@ -1,7 +1,6 @@
 import mlflow
 import pandas as pd
 import joblib
-import os
 from mlflow.tracking import MlflowClient
 
 _EXPECTED_COLUMNS = [
