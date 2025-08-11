@@ -9,8 +9,10 @@ from src.inference import get_production_model, predict_price
 
 # Prometheus glue from metrics.py
 from app.metrics import (
-    install_metrics, metrics_endpoint,
-    PREDICTIONS_TOTAL, INFERENCE_SECONDS
+    install_metrics,
+    metrics_endpoint,
+    PREDICTIONS_TOTAL,
+    INFERENCE_SECONDS,
 )
 
 # ✅ Use the Pydantic schema with validations
@@ -22,7 +24,7 @@ DB_FILE_PATH = "database/prediction_logs.db"
 app = FastAPI(
     title="California Housing Price Predictor",
     description="Predicts median housing price and logs inputs/outputs",
-    version="1.1"
+    version="1.1",
 )
 
 # Install Prometheus middleware
@@ -30,39 +32,45 @@ install_metrics(app)
 
 
 logging.basicConfig(
-    filename=LOG_FILE_PATH,
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s"
+    filename=LOG_FILE_PATH, level=logging.INFO, format="%(asctime)s - %(message)s"
 )
+
 
 def init_db():
     conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
-    c.execute('''
+    c.execute(
+        """
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             input TEXT,
             prediction REAL
         )
-    ''')
+    """
+    )
     conn.commit()
     conn.close()
+
+
 init_db()
+
 
 def log_to_db(input_data: dict, prediction: float):
     conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
     c.execute(
         "INSERT INTO logs (timestamp, input, prediction) VALUES (?, ?, ?)",
-        (datetime.utcnow().isoformat(), str(input_data), float(prediction))
+        (datetime.utcnow().isoformat(), str(input_data), float(prediction)),
     )
     conn.commit()
     conn.close()
 
+
 @app.get("/")
 def read_root():
     return {"message": "California Housing Prediction API is live."}
+
 
 @app.post("/predict")
 async def predict(input_data: HousingFeatures, request: Request):
@@ -79,10 +87,12 @@ async def predict(input_data: HousingFeatures, request: Request):
     log_to_db(input_dict, prediction)
     return {"predicted_price": float(prediction)}
 
+
 # Prometheus scrape endpoint
 @app.get("/metrics")
 def metrics():
     return metrics_endpoint()
+
 
 # Default lightweight stats (keep separate from /metrics)
 @app.get("/stats")

@@ -39,8 +39,6 @@ jobs:
       - name: Black (format check)
         run: black --check .
 
-      - name: MyPy (optional)
-        run: mypy app src || true  # remove '|| true' if you want strict fail
 
   detect-changes:
     needs: lint

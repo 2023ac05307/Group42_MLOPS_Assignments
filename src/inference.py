@@ -4,8 +4,17 @@ import joblib
 from mlflow.tracking import MlflowClient
 
 _EXPECTED_COLUMNS = [
-    "MedInc","HouseAge","AveRooms","AveBedrms","Population","AveOccup","Latitude","Longitude","OceanProximity"
+    "MedInc",
+    "HouseAge",
+    "AveRooms",
+    "AveBedrms",
+    "Population",
+    "AveOccup",
+    "Latitude",
+    "Longitude",
+    "OceanProximity",
 ]
+
 
 def _ensure_input_schema(df: pd.DataFrame):
     """Defensive: make sure expected cols exist before rename/transform."""
@@ -14,6 +23,7 @@ def _ensure_input_schema(df: pd.DataFrame):
         raise ValueError(f"Missing required columns: {missing}")
     if len(df) != 1:
         raise ValueError("predict_price expects a single-row DataFrame")
+
 
 def get_production_model(model_name: str = "CaliforniaHousingModel"):
     """Fetch the production-tagged model & preprocessor; ensure only ONE version has stage=production.
@@ -59,9 +69,7 @@ def get_production_model(model_name: str = "CaliforniaHousingModel"):
         if v.version != chosen.version:
             try:
                 client.delete_model_version_tag(
-                    name=model_name,
-                    version=v.version,
-                    key="stage"
+                    name=model_name, version=v.version, key="stage"
                 )
                 print(f"Removed 'stage' tag from version {v.version}")
             except Exception as e:
@@ -74,14 +82,11 @@ def get_production_model(model_name: str = "CaliforniaHousingModel"):
     model = mlflow.pyfunc.load_model(artifact_uri)
 
     preprocessor_path = client.download_artifacts(
-        run_id=chosen.run_id,
-        path="datapreprocessing/preprocessor.pkl"
+        run_id=chosen.run_id, path="datapreprocessing/preprocessor.pkl"
     )
     preprocessor = joblib.load(preprocessor_path)
 
     return model, preprocessor
-
-
 
 
 def predict_price(model, preprocessor, input_df: pd.DataFrame) -> float:
@@ -109,20 +114,22 @@ def predict_price(model, preprocessor, input_df: pd.DataFrame) -> float:
     """
     _ensure_input_schema(input_df)
 
-    input_df = input_df.rename(columns={
-        "MedInc": "median_income",
-        "HouseAge": "housing_median_age",
-        "AveRooms": "total_rooms",
-        "AveBedrms": "total_bedrooms",
-        "Population": "population",
-        "AveOccup": "households",
-        "Latitude": "latitude",
-        "Longitude": "longitude",
-        "OceanProximity": "ocean_proximity"
-    })
+    input_df = input_df.rename(
+        columns={
+            "MedInc": "median_income",
+            "HouseAge": "housing_median_age",
+            "AveRooms": "total_rooms",
+            "AveBedrms": "total_bedrooms",
+            "Population": "population",
+            "AveOccup": "households",
+            "Latitude": "latitude",
+            "Longitude": "longitude",
+            "OceanProximity": "ocean_proximity",
+        }
+    )
 
-    #print("✅ Columns in input_df just before transformation:", input_df.columns.tolist())
-    #print("✅ Data:\n", input_df)
+    # print("✅ Columns in input_df just before transformation:", input_df.columns.tolist())
+    # print("✅ Data:\n", input_df)
 
     transformed_input = preprocessor.transform(input_df)
     prediction = model.predict(transformed_input)

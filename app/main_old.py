@@ -17,8 +17,9 @@ DB_FILE_PATH = "database/prediction_logs.db"
 app = FastAPI(
     title="California Housing Price Predictor",
     description="Predicts median housing price and logs inputs/outputs",
-    version="1.1"
+    version="1.1",
 )
+
 
 # Input schema
 class HousingFeatures(BaseModel):
@@ -32,33 +33,35 @@ class HousingFeatures(BaseModel):
     Longitude: float
     OceanProximity: str
 
+
 # Setup logging to file
 logging.basicConfig(
-    filename=LOG_FILE_PATH,
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s"
+    filename=LOG_FILE_PATH, level=logging.INFO, format="%(asctime)s - %(message)s"
 )
 
 # Load production model
-
 
 
 # Initialize SQLite DB
 def init_db():
     conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
-    c.execute('''
+    c.execute(
+        """
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             input TEXT,
             prediction REAL
         )
-    ''')
+    """
+    )
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 # Save log to SQLite
 def log_to_db(input_data: dict, prediction: float):
@@ -66,14 +69,16 @@ def log_to_db(input_data: dict, prediction: float):
     c = conn.cursor()
     c.execute(
         "INSERT INTO logs (timestamp, input, prediction) VALUES (?, ?, ?)",
-        (datetime.utcnow().isoformat(), str(input_data), prediction)
+        (datetime.utcnow().isoformat(), str(input_data), prediction),
     )
     conn.commit()
     conn.close()
 
+
 @app.get("/")
 def read_root():
     return {"message": "California Housing Prediction API is live."}
+
 
 @app.post("/predict")
 async def predict(input_data: HousingFeatures, request: Request):
@@ -87,6 +92,7 @@ async def predict(input_data: HousingFeatures, request: Request):
     log_to_db(input_dict, prediction)
 
     return {"predicted_price": prediction}
+
 
 @app.get("/metrics")
 def metrics():
@@ -105,8 +111,4 @@ def list_all_predictions():
     with sqlite3.connect(DB_FILE_PATH) as conn:
         conn.row_factory = sqlite3.Row  # rows become dict-like
         rows = conn.execute("SELECT * FROM logs").fetchall()
-    return {
-        "count": len(rows),
-        "predictions": [dict(r) for r in rows]
-    }
-
+    return {"count": len(rows), "predictions": [dict(r) for r in rows]}
