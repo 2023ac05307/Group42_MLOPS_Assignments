@@ -1,19 +1,24 @@
-import json, os, urllib.request, urllib.error
+import json
+import os
+import urllib.request
+import urllib.error
 import boto3
 
 secrets = boto3.client("secretsmanager")
 
-OWNER   = os.environ["GITHUB_OWNER"]
-REPO    = os.environ["GITHUB_REPO"]
-WF_ID   = os.environ["GITHUB_WORKFLOW"]   # e.g., 'retrain.yaml' or '1234567'
-REF     = os.environ.get("GITHUB_REF","main")
+OWNER = os.environ["GITHUB_OWNER"]
+REPO = os.environ["GITHUB_REPO"]
+WF_ID = os.environ["GITHUB_WORKFLOW"]  # e.g., 'retrain.yaml' or '1234567'
+REF = os.environ.get("GITHUB_REF", "main")
 PAT_ARN = os.environ["GITHUB_PAT_SECRET_ARN"]
 S3_KEY_FILTER = "housing.csv"
+
 
 def _github_pat():
     val = secrets.get_secret_value(SecretId=PAT_ARN)
     s = val.get("SecretString") or ""
     return s.strip()
+
 
 def _trigger_github_dispatch(token, inputs):
     url = f"https://api.github.com/repos/{OWNER}/{REPO}/actions/workflows/{WF_ID}/dispatches"
@@ -24,6 +29,7 @@ def _trigger_github_dispatch(token, inputs):
     with urllib.request.urlopen(req) as resp:
         return resp.status
 
+
 def handler(event, context):
     # S3 can batch multiple records
     token = _github_pat()
@@ -33,15 +39,10 @@ def handler(event, context):
             continue
         s3 = rec.get("s3", {})
         bucket = s3.get("bucket", {}).get("name")
-        key    = s3.get("object", {}).get("key")
-        etag   = s3.get("object", {}).get("eTag")
+        key = s3.get("object", {}).get("key")
+        etag = s3.get("object", {}).get("eTag")
 
-
-        inputs = {
-            "s3_bucket": bucket or "",
-            "s3_key": key or "",
-            "s3_etag": etag or ""
-        }
+        inputs = {"s3_bucket": bucket or "", "s3_key": key or "", "s3_etag": etag or ""}
         try:
             status = _trigger_github_dispatch(token, inputs)
             triggered += 1
