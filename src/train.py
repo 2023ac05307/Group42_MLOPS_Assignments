@@ -18,7 +18,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def _dense_example(X):
     """Return a 1-row input_example that works for signature logging (handles sparse)."""
-    
     x1 = X[0:1]
     return x1.toarray() if hasattr(x1, "toarray") else x1
 

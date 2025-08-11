@@ -104,6 +104,7 @@ jobs:
           fi
 
   build-and-deploy:
+    needs: [detect-changes, train-and-register]
     if: github.actor != 'github-actions[bot]'
     runs-on: [self-hosted, Linux, X64]
     env:
