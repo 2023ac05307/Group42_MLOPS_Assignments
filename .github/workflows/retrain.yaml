@@ -1,8 +1,5 @@
 name: Retrain on data change in S3
-
 on:
-  push:
-    branches: [ main_v ]
   workflow_dispatch:
     inputs:
       s3_bucket: { required: false }

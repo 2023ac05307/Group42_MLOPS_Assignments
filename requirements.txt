@@ -10,3 +10,4 @@ uvicorn
 mlflow
 psutil
 numpy
+prometheus-client

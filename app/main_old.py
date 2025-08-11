@@ -1,30 +1,26 @@
-# app/main.py
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
-import logging, sqlite3
+import logging
+import sqlite3
 from datetime import datetime
 import pandas as pd
 
+# Import from src.inference
 from src.inference import get_production_model, predict_price
 
-# Prometheus glue from metrics.py
-from app.metrics import (
-    install_metrics, metrics_endpoint,
-    PREDICTIONS_TOTAL, INFERENCE_SECONDS
-)
 
 LOG_FILE_PATH = "logs/predictions.log"
 DB_FILE_PATH = "database/prediction_logs.db"
 
+
+# Init FastAPI
 app = FastAPI(
     title="California Housing Price Predictor",
     description="Predicts median housing price and logs inputs/outputs",
     version="1.1"
 )
 
-# Install Prometheus middleware
-install_metrics(app)
-
+# Input schema
 class HousingFeatures(BaseModel):
     MedInc: float
     HouseAge: float
@@ -36,12 +32,18 @@ class HousingFeatures(BaseModel):
     Longitude: float
     OceanProximity: str
 
+# Setup logging to file
 logging.basicConfig(
     filename=LOG_FILE_PATH,
     level=logging.INFO,
     format="%(asctime)s - %(message)s"
 )
 
+# Load production model
+
+
+
+# Initialize SQLite DB
 def init_db():
     conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
@@ -55,14 +57,16 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
+
 init_db()
 
+# Save log to SQLite
 def log_to_db(input_data: dict, prediction: float):
     conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
     c.execute(
         "INSERT INTO logs (timestamp, input, prediction) VALUES (?, ?, ?)",
-        (datetime.utcnow().isoformat(), str(input_data), float(prediction))
+        (datetime.utcnow().isoformat(), str(input_data), prediction)
     )
     conn.commit()
     conn.close()
@@ -76,27 +80,33 @@ async def predict(input_data: HousingFeatures, request: Request):
     model, preprocessor = get_production_model("CaliforniaHousingModel")
     input_dict = input_data.dict()
     input_df = pd.DataFrame([input_dict])
+    prediction = predict_price(model, preprocessor, input_df)
 
-    # Measure inference time + increment counter
-    with INFERENCE_SECONDS.time():
-        prediction = predict_price(model, preprocessor, input_df)
-    PREDICTIONS_TOTAL.inc()
-
+    # Log to file and SQLite
     logging.info(f"Input: {input_dict} => Prediction: {prediction}")
     log_to_db(input_dict, prediction)
-    return {"predicted_price": float(prediction)}
 
-# Prometheus scrape endpoint
+    return {"predicted_price": prediction}
+
 @app.get("/metrics")
 def metrics():
-    return metrics_endpoint()
-
-# Optional: lightweight stats (keep separate from /metrics)
-@app.get("/stats")
-def stats():
     conn = sqlite3.connect(DB_FILE_PATH)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM logs")
     total_requests = c.fetchone()[0]
+
     conn.close()
     return {"total_prediction_requests": total_requests}
+
+
+@app.get("/predictions")
+def list_all_predictions():
+    """Return every row from the logs table (inputs + prediction)."""
+    with sqlite3.connect(DB_FILE_PATH) as conn:
+        conn.row_factory = sqlite3.Row  # rows become dict-like
+        rows = conn.execute("SELECT * FROM logs").fetchall()
+    return {
+        "count": len(rows),
+        "predictions": [dict(r) for r in rows]
+    }
+
