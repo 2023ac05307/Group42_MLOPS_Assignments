@@ -36,18 +36,25 @@
 .
 ├─ app/                       # FastAPI app (serving)
 │  └─ main.py
+│  └─ metrics.py
+│  └─ schemas.py
+
 ├─ src/                       # Training code
 │  ├─ train.py
+│  └─ data_preprocessing.py
 │  └─ inference.py
-├─ data/                      # DVC-tracked data directory
-│  └─ housing.csv.dvc         # pointer tracked by git (not raw CSV)
+
 ├─ dvc.yaml                   # DVC pipeline stages
 ├─ requirements.txt
 ├─ Dockerfile
 ├─ Makefile                   # optional: handy commands
 ├─ .github/workflows/
-│  ├─ ci.yml
+│  ├─ ci-cd.yml
 │  └─ retrain.yml
+├─ logs/                      # for storing prediction logs
+├─ monitoring/
+│  └─ docker-compose.monitoring.yaml
+│  └─ prometheus.yaml
 ├─ docs/
 │  └─ architecture.png
 └─ README.md
@@ -101,30 +108,16 @@ dvc push
 ---
 
 ## 🧪 MLflow Setup
-**Run server (example):**
+**Run server as systemd service (example):**
 ```bash
 mlflow server \
   --host 0.0.0.0 --port 5000 \
   --backend-store-uri sqlite:///mlflow.db \
   --default-artifact-root s3://$MLFLOW_S3_BUCKET/
 ```
-> For production, use **PostgreSQL** for `--backend-store-uri`.
 
 **Training code (snippet):**
-```python
-import mlflow, mlflow.sklearn
-from sklearn.linear_model import LinearRegression
-
-with mlflow.start_run(run_name="LinearRegression"):
-    model = LinearRegression().fit(X_train, y_train)
-    rmse = mean_squared_error(y_test, model.predict(X_test), squared=False)
-    mlflow.log_metric("rmse", rmse)
-    mlflow.sklearn.log_model(model, "model")
-
-    # Register new version
-    model_name = "California_Housing_Regression"
-    result = mlflow.register_model(f"runs:/{mlflow.active_run().info.run_id}/model", model_name)
-```
+refer: src/train.py
 Promotion to **Staging/Production** can be manual (UI) or automated (CI step).
 
 ---
@@ -132,20 +125,19 @@ Promotion to **Staging/Production** can be manual (UI) or automated (CI step).
 ## 🧱 DVC Pipeline (`dvc.yaml` example)
 ```yaml
 stages:
-  preprocess:
-    cmd: python src/train.py --step preprocess
-    deps: [data/housing.csv, src/train.py]
-    outs: [artifacts/clean.parquet]
-
+  fetch_housing:
+    cmd: aws s3 cp s3://dvc-data-src/housing.csv data/housing.csv
+    deps:
+      - s3://dvc-data-src/housing.csv
+    outs:
+      - data/housing.csv
   train:
-    cmd: python src/train.py --step train --in artifacts/clean.parquet --out artifacts/model.pkl
-    deps: [artifacts/clean.parquet, src/train.py]
-    outs: [artifacts/model.pkl]
-
-  evaluate:
-    cmd: python src/train.py --step evaluate --model artifacts/model.pkl
-    deps: [artifacts/model.pkl, src/train.py]
-    outs: [artifacts/metrics.json]
+    cmd: python3.11 src/train.py
+    deps:
+      - src/train.py
+      - src/data_preprocessing.py
+      - src/inference.py
+      - s3://dvc-data-src/housing.csv
 ```
 > Your `train.py` should log to MLflow and register the best model.
 
@@ -153,28 +145,7 @@ stages:
 
 ## 🧰 GitHub Actions
 
-**`.github/workflows/ci.yml` (code path)**
-```yaml
-name: CI & Build
-on:
-  push: { branches: [main] }
-  pull_request:
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.10" }
-      - run: pip install -r requirements.txt
-      - run: pytest -q
-      - name: Build & push image
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-be:${{ github.sha }} .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-be:${{ github.sha }}
-```
-
+**`.github/workflows/ci-cd.yml` (code path)**
 **`.github/workflows/retrain.yml` (data path)**
 ```yaml
 name: Retrain on Data Update
@@ -211,19 +182,67 @@ jobs:
 
 **Lambda → GitHub dispatch (pseudo)**
 ```python
-import requests, os, json
-GITHUB_TOKEN = os.environ["GH_PAT"]
-repo = os.environ["REPO"]  # e.g. org/project
-requests.post(
-  f"https://api.github.com/repos/{repo}/dispatches",
-  headers={"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.everest-preview+json"},
-  json={"event_type": "s3-data-updated"}
-)
+import json, os, urllib.request, urllib.error
+import boto3
+
+secrets = boto3.client("secretsmanager")
+
+OWNER   = os.environ["GITHUB_OWNER"]
+REPO    = os.environ["GITHUB_REPO"]
+WF_ID   = os.environ["GITHUB_WORKFLOW"]   # e.g., 'retrain.yaml' or '1234567'
+REF     = os.environ.get("GITHUB_REF","main")
+PAT_ARN = os.environ["GITHUB_PAT_SECRET_ARN"]
+S3_KEY_FILTER = "housing.csv"
+
+def _github_pat():
+    val = secrets.get_secret_value(SecretId=PAT_ARN)
+    s = val.get("SecretString") or ""
+    return s.strip()
+
+def _trigger_github_dispatch(token, inputs):
+    url = f"https://api.github.com/repos/{OWNER}/{REPO}/actions/workflows/{WF_ID}/dispatches"
+    body = json.dumps({"ref": REF, "inputs": inputs}).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST")
+    req.add_header("Accept", "application/vnd.github+json")
+    req.add_header("Authorization", f"token {token}")
+    with urllib.request.urlopen(req) as resp:
+        return resp.status
+
+def handler(event, context):
+    # S3 can batch multiple records
+    token = _github_pat()
+    triggered = 0
+    for rec in event.get("Records", []):
+        if rec.get("eventSource") != "aws:s3":
+            continue
+        s3 = rec.get("s3", {})
+        bucket = s3.get("bucket", {}).get("name")
+        key    = s3.get("object", {}).get("key")
+        etag   = s3.get("object", {}).get("eTag")
+
+
+        inputs = {
+            "s3_bucket": bucket or "",
+            "s3_key": key or "",
+            "s3_etag": etag or ""
+        }
+        try:
+            status = _trigger_github_dispatch(token, inputs)
+            triggered += 1
+            print(f"Dispatched workflow {WF_ID} for {key} (HTTP {status})")
+        except urllib.error.HTTPError as e:
+            print(f"GitHub API error {e.code}: {e.read().decode()}")
+            raise
+        except Exception as e:
+            print(f"Error dispatching workflow: {e}")
+            raise
+
+    return {"dispatched": triggered}
 ```
 
 ---
 
-## 🚢 Deploying FastAPI to EC2
+## 🚢 Deploying FastAPI to EC2 via ci-cd.yaml
 ```bash
 docker run -d --name fastapi \
   -p 80:8000 \
@@ -238,48 +257,8 @@ docker run -d --name fastapi \
 ---
 
 ## 📊 Monitoring
-- **Prometheus** scrapes `http://ec2-host:80/metrics` (request count, latency, error rate; add model drift metrics if logged).
-- **Grafana** dashboards visualize SLOs and model KPIs.
-
+- **Prometheus** scrapes `http://ec2-host:9090/metrics` (request count, latency, error rate; add model drift metrics if logged).
+- **Grafana** dashboards visualize SLOs and model KPIs and its endpoint is as `http://ec2-host:3000/dashboards`.
+---
 ---
 
-## 🔒 Security Notes
-- Prefer **IAM roles/OIDC** over long‑lived keys.
-- Keep secrets in **Secrets Manager**/**GitHub Encrypted Secrets**.
-- Restrict S3 buckets with least‑privilege policies.
-- Use private subnets + security groups for EC2/MLflow.
-
----
-
-## 🧩 Makefile (optional)
-```makefile
-setup: ## install deps
-\tpip install -r requirements.txt
-
-train: ## run local training via dvc
-\tdvc repro
-
-serve: ## run fastapi locally
-\tuvicorn app.main:app --reload --port 8000
-
-push-data:
-\tdvc push
-```
-
----
-
-## ❗ Troubleshooting
-- **`dvc pull` says “No remote provided”** → ensure `.dvc/config` is committed and `remote add -d s3remote` exists.
-- **MLflow artifacts not saving to S3** → set `--default-artifact-root s3://…` and ensure IAM perms.
-- **Model not found in serving** → verify `MODEL_NAME` and stage; confirm promotion in MLflow UI.
-- **Docker login fails in CI** → set `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets.
-
----
-
-## 📄 License
-MIT (or your organization’s license).
-
----
-
-## 🤝 Contributing
-PRs welcome. Please run `pytest` and `make train` before submitting.
