@@ -4,8 +4,8 @@ services:
     image: prom/prometheus:v2.53.0
     network_mode: host
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    command: ["--config.file=/etc/prometheus/prometheus.yaml"]
 
   grafana:
     image: grafana/grafana:11.1.0

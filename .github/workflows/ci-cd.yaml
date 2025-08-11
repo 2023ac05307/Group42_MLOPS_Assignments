@@ -14,7 +14,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Add github.com to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+
+      - name: Install linters
+        run: |
+          pip3.11 install ruff==0.6.7 black==24.8.0 mypy==1.10.0
+
+      # Fast all-in-one linter (style + many flake8 rules)
+      - name: Ruff (lint)
+        run: ruff check .
+
+      # Formatting check (no file changes in CI)
+      - name: Black (format check)
+        run: black --check .
+
+      - name: MyPy (optional)
+        run: mypy app src || true  # remove '|| true' if you want strict fail
+
   detect-changes:
+    needs: lint
     runs-on: [self-hosted, Linux, X64]
     outputs:
       model_code_changed: ${{ steps.filter.outputs.model_code }}

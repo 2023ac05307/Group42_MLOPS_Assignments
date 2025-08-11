@@ -13,6 +13,9 @@ from app.metrics import (
     PREDICTIONS_TOTAL, INFERENCE_SECONDS
 )
 
+# ✅ Use the Pydantic schema with validations
+from app.schemas import HousingFeatures
+
 LOG_FILE_PATH = "logs/predictions.log"
 DB_FILE_PATH = "database/prediction_logs.db"
 
@@ -25,16 +28,6 @@ app = FastAPI(
 # Install Prometheus middleware
 install_metrics(app)
 
-class HousingFeatures(BaseModel):
-    MedInc: float
-    HouseAge: float
-    AveRooms: float
-    AveBedrms: float
-    Population: float
-    AveOccup: float
-    Latitude: float
-    Longitude: float
-    OceanProximity: str
 
 logging.basicConfig(
     filename=LOG_FILE_PATH,

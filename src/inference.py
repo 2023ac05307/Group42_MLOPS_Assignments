@@ -4,6 +4,17 @@ import joblib
 import os
 from mlflow.tracking import MlflowClient
 
+_EXPECTED_COLUMNS = [
+    "MedInc","HouseAge","AveRooms","AveBedrms","Population","AveOccup","Latitude","Longitude","OceanProximity"
+]
+
+def _ensure_input_schema(df: pd.DataFrame):
+    """Defensive: make sure expected cols exist before rename/transform."""
+    missing = [c for c in _EXPECTED_COLUMNS if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+    if len(df) != 1:
+        raise ValueError("predict_price expects a single-row DataFrame")
 
 def get_production_model(model_name: str = "CaliforniaHousingModel"):
     """Fetch the production-tagged model & preprocessor; ensure only ONE version has stage=production.
@@ -97,6 +108,7 @@ def predict_price(model, preprocessor, input_df: pd.DataFrame) -> float:
         - If your model was logged as a full Pipeline(preprocessor+model), you could
           skip manual preprocessing and feed raw features directly to `model.predict`.
     """
+    _ensure_input_schema(input_df)
 
     input_df = input_df.rename(columns={
         "MedInc": "median_income",
@@ -116,4 +128,3 @@ def predict_price(model, preprocessor, input_df: pd.DataFrame) -> float:
     transformed_input = preprocessor.transform(input_df)
     prediction = model.predict(transformed_input)
     return prediction[0]
-
