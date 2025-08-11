@@ -91,7 +91,7 @@ async def predict(input_data: HousingFeatures, request: Request):
 def metrics():
     return metrics_endpoint()
 
-# Optional: lightweight stats (keep separate from /metrics)
+# Default lightweight stats (keep separate from /metrics)
 @app.get("/stats")
 def stats():
     conn = sqlite3.connect(DB_FILE_PATH)
