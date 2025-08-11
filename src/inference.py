@@ -64,18 +64,6 @@ def get_production_model(model_name: str = "CaliforniaHousingModel"):
     chosen = prod_versions[-1]
     print(f"Chosen production version: {chosen.version}")
 
-    # Ensure ONLY the chosen version keeps the stage tag; remove from others
-    for v in versions:
-        if v.version != chosen.version:
-            try:
-                client.delete_model_version_tag(
-                    name=model_name, version=v.version, key="stage"
-                )
-                print(f"Removed 'stage' tag from version {v.version}")
-            except Exception as e:
-                # Tag may not exist or permissions may block deletion; ignore quietly
-                print(f"Skipping tag removal for version {v.version}: {e}")
-
     # Load model and its preprocessor artifact
     artifact_uri = chosen.source
     print(f"Loading model from {artifact_uri}")
@@ -128,8 +116,6 @@ def predict_price(model, preprocessor, input_df: pd.DataFrame) -> float:
         }
     )
 
-    # print("✅ Columns in input_df just before transformation:", input_df.columns.tolist())
-    # print("✅ Data:\n", input_df)
 
     transformed_input = preprocessor.transform(input_df)
     prediction = model.predict(transformed_input)
