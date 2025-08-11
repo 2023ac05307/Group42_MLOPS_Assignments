@@ -1,19 +1,50 @@
-name: MLOps CI/CD
+name: MLOps CI/CD (code-change → train → deploy)
 
 on:
   push:
     branches: [ main ]
+    # Ignore bot commits that only update DVC metadata
+    paths-ignore:
+      - 'dvc.lock'
+      - '.dvc/**'
+      - 'data/**'
+
+concurrency:
+  group: ci-main
+  cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  detect-changes:
     runs-on: [self-hosted, Linux, X64]
-    env:
-      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/fastapi-be
-      APP_PORT: 8000
+    outputs:
+      model_code_changed: ${{ steps.filter.outputs.model_code }}
     steps:
-      - name: Checkout
-      # v4 recommended
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      # Classify what changed
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          filters: |
+            model_code:
+              - 'src/**'
+              - 'data_preprocessing.py'
+              - 'requirements.txt'
+              - 'train.py'
+              - 'dvc.yaml'
+              - 'params.yaml'
+
+  train-and-register:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.model_code_changed == 'true'
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY }}
@@ -22,60 +53,107 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts
-          
-      - name: Docker login (Docker Hub)
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # If runner has IAM role, you can skip keys
+      - name: AWS sanity
+        if: env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != ''
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: aws sts get-caller-identity
+
+      - name: Ensure Git identity (for the dvc.lock commit)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Pull latest cache/objects before status
+      - name: DVC fetch
+        run: dvc fetch
+
+      - name: DVC status
+        id: dvcstat
+        run: dvc status || true
+
+      # Optional: align workspace with remote cache
+      - name: DVC pull (optional)
+        run: dvc pull
+
+      # Reproduce the pipeline (runs training, etc.)
+      - name: DVC repro
+        run: dvc repro
+
+      # Push new artifacts to DVC remote
+      - name: DVC push
+        run: dvc push
+
+      # Commit ONLY DVC metadata so we have reproducibility; avoid src/** changes!
+      - name: Commit updated dvc.lock (no retrigger)
+        run: |
+          git add dvc.lock
+          # Guard: make sure nothing else is staged accidentally
+          git reset -- src/ || true
+          git reset -- data_preprocessing.py || true
+          git reset -- train.py || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Retrain: update dvc.lock (auto) [skip ci]"
+            git push
+          fi
+
+  build-and-deploy:
+    needs: [detect-changes, train-and-register]
+    if: github.actor != 'github-actions[bot]'
+    runs-on: [self-hosted, Linux, X64]
+    env:
+      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/fastapi-be
+      APP_PORT: 8000
+      EC2_PUBLIC_ID: ${{vars.EC2_HOST}}
+      SHA: ${{ github.sha }}   # consistent SHA from the *original* push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.SHA }}
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Add github.com to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+
+      - name: Docker login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ vars.DOCKERHUB_USERNAME }}" --password-stdin
+
       - name: Build image
-        run: |
-          docker build -t "$IMAGE:${{ github.sha }}" .
+        run: docker build -t "$IMAGE:${{ env.SHA }}" .
 
       - name: Push image
-        run: |
-          docker push "$IMAGE:${{ github.sha }}"
-
-      # Everything below runs on the same EC2 self-hosted runner (no SSH needed)
+        run: docker push "$IMAGE:${{ env.SHA }}"
 
       - name: Pull on EC2 runner
-        run: docker pull "$IMAGE:${{ github.sha }}"
+        run: docker pull "$IMAGE:${{ env.SHA }}"
 
       - name: Restart container
         run: |
-          # stop & remove if exists
           docker rm -f calfornia-housing-api 2>/dev/null || true
-          # run new container
           docker run -d --name calfornia-housing-api --restart unless-stopped \
-            -p ${APP_PORT}:8000 \
-            "$IMAGE:${{ github.sha }}"
+            -p ${APP_PORT}:8000 "$IMAGE:${{ env.SHA }}"
 
-      - name: Wait for app to be up
+      - name: Warmup
         run: |
-          # simple warmup loop
           for i in {1..30}; do
             if curl -fsS "http://localhost:${APP_PORT}/" >/dev/null; then
-              echo "Calfornia Housing API is live and running as expected"; break
+              echo "API is live"; break
             fi
             sleep 2
           done
-
-      - name: Print endpoints
-        id: urls
-        shell: bash
-        run: |
-          # Try EC2 public IP, fall back to localhost if unavailable
-          PUB_IP="$(curl -s --max-time 2 http://169.254.169.254/latest/meta-data/public-ipv4 || true)"
-          if [ -z "$PUB_IP" ]; then PUB_IP="localhost"; fi
-          BASE="http://${PUB_IP}:${APP_PORT}"
-          echo "BASE=$BASE" >> $GITHUB_OUTPUT
-
-          echo "Base:     ${BASE}/"
-          echo "Metrics:  ${BASE}/metrics"
-          echo "Predict:  ${BASE}/predict"
-
-          {
-            echo "## Deployed API Endpoints"
-            echo ""
-            echo "- **Base**: ${BASE}/"
-            echo "- **Metrics**: ${BASE}/metrics"
-            echo "- **Predict**: ${BASE}/predict"
-          } >> "$GITHUB_STEP_SUMMARY"
