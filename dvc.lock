@@ -17,8 +17,8 @@ stages:
       size: 5021
     - path: src/train.py
       hash: md5
-      md5: 0f09f82f6cd7bb3d7dbb7ebfde20d442
-      size: 4808
+      md5: 7debc6e081c77c0fcdb31a858dda7427
+      size: 4799
   fetch_housing:
     cmd: aws s3 cp s3://dvc-data-src/housing.csv data/housing.csv
     deps:
