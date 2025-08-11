@@ -14,61 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    runs-on: [self-hosted, Linux, X64]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ssh-key: ${{ secrets.DEPLOY_KEY }}
-
-      - name: Add github.com to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
-
-      - name: Install linters
-        run: |
-          pip3.11 install ruff==0.6.7 black==24.8.0 mypy==1.10.0
-
-      # Fast all-in-one linter (style + many flake8 rules)
-      - name: Ruff (lint)
-        run: ruff check .
-
-      # Formatting check (no file changes in CI)
-      - name: Black (format check)
-        run: black --check .
-
-
-  detect-changes:
-    needs: lint
-    runs-on: [self-hosted, Linux, X64]
-    outputs:
-      model_code_changed: ${{ steps.filter.outputs.model_code }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ssh-key: ${{ secrets.DEPLOY_KEY }}
-
-      # Classify what changed
-      - name: Paths filter
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          filters: |
-            model_code:
-              - 'src/**'
-              - 'data_preprocessing.py'
-              - 'requirements.txt'
-              - 'train.py'
-              - 'dvc.yaml'
-              - 'params.yaml'
-
   train-and-register:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.model_code_changed == 'true'
     runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v4
@@ -96,6 +42,18 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install linters
+        run: |
+          pip3.11 install ruff==0.6.7 black==24.8.0 mypy==1.10.0
+
+      # Fast all-in-one linter (style + many flake8 rules)
+      - name: Ruff (lint)
+        run: ruff check .
+
+      # Formatting check (no file changes in CI)
+      - name: Black (format check)
+        run: black --check .
 
       # Pull latest cache/objects before status
       - name: DVC fetch
@@ -131,7 +89,7 @@ jobs:
           fi
 
   build-and-deploy:
-    needs: [detect-changes, train-and-register]
+    needs: [train-and-register]
     if: github.actor != 'github-actions[bot]'
     runs-on: [self-hosted, Linux, X64]
     env:
