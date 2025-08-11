@@ -9,16 +9,16 @@ stages:
       size: 1422773
     - path: src/data_preprocessing.py
       hash: md5
-      md5: a736170f500509bdb24c06008f108537
-      size: 1508
+      md5: a99973e7ccb7d3f2d6cb94e1cf771656
+      size: 2115
     - path: src/inference.py
       hash: md5
-      md5: 551c2ccb279c7b59354d111b6df2ab49
-      size: 1737
+      md5: 9060dbcbfeca73086faa79a53d5c4875
+      size: 4448
     - path: src/train.py
       hash: md5
-      md5: 770c22111cfd08fb5ae51aab83fea2ed
-      size: 4428
+      md5: 3e4df2d8f790f66ebaea769fbb3c1e16
+      size: 4756
   fetch_housing:
     cmd: aws s3 cp s3://dvc-data-src/housing.csv data/housing.csv
     deps:
