@@ -48,7 +48,7 @@ def train_and_log_model(name, model, X_train, y_train, X_test, y_test, preproces
         example = _dense_example(X_test)
         sig = mlflow.models.infer_signature(example, preds[0:1])
         mlflow.sklearn.log_model(
-            sk_model=model, artifact_path="model", input_example=example, signature=sig
+            sk_model=model, name="model", input_example=example, signature=sig
         )
 
         logging.info(f"{name} - RMSE: {rmse:.4f}, R²: {r2:.4f}")
