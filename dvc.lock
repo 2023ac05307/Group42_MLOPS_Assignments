@@ -5,8 +5,8 @@ stages:
     deps:
     - path: s3://dvc-data-src/housing.csv
       hash: md5
-      etag: 81f0b9f5d963b97f0fc7a93b1e03953d
-      size: 1422773
+      etag: abe428a1eff83f6a66be9a67a4a61608
+      size: 1422837
     - path: src/data_preprocessing.py
       hash: md5
       md5: 4eaddcc16efcd870ff57ede15f0b96b3
@@ -24,10 +24,10 @@ stages:
     deps:
     - path: s3://dvc-data-src/housing.csv
       hash: md5
-      etag: 81f0b9f5d963b97f0fc7a93b1e03953d
-      size: 1422773
+      etag: abe428a1eff83f6a66be9a67a4a61608
+      size: 1422837
     outs:
     - path: data/housing.csv
       hash: md5
-      md5: 81f0b9f5d963b97f0fc7a93b1e03953d
-      size: 1422773
+      md5: abe428a1eff83f6a66be9a67a4a61608
+      size: 1422837
