@@ -2,7 +2,7 @@ name: MLOps CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main_ ]
 
 jobs:
   build-and-deploy:
