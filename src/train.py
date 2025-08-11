@@ -18,6 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def _dense_example(X):
     """Return a 1-row input_example that works for signature logging (handles sparse)."""
+    
     x1 = X[0:1]
     return x1.toarray() if hasattr(x1, "toarray") else x1
 
@@ -94,7 +95,7 @@ def log_system_metrics(interval=5, duration=15):
         time.sleep(interval)
 
 def main():
-    """data -> preprocess -> train LR & Tree -> pick best -> register."""
+    """data -> preprocess -> train LR & Tree -> pick best -> register best model in mlflow"""
     mlflow.set_tracking_uri("http://ec2-44-203-72-164.compute-1.amazonaws.com:5000/")
     mlflow.set_experiment("California_Housing_Regression")
 
