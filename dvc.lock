@@ -13,8 +13,8 @@ stages:
       size: 2174
     - path: src/inference.py
       hash: md5
-      md5: 762ee6053b5b62316f7becd0e1d3ac23
-      size: 5021
+      md5: 9b2331ad1ef0658ca2b2e552c0fb171e
+      size: 4328
     - path: src/train.py
       hash: md5
       md5: 7debc6e081c77c0fcdb31a858dda7427
