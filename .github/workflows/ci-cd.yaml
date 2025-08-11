@@ -165,11 +165,19 @@ jobs:
       - name: Pull on EC2 runner
         run: docker pull "$IMAGE:${{ env.SHA }}"
 
+      - name: Prepare persistent host dirs
+        run: |
+          sudo mkdir -p /opt/fastapibe-api/database /opt/fastapibe-api/logs
+          sudo chown -R $USER:$USER /opt/fastapibe-api
+
       - name: Restart container
         run: |
           docker rm -f calfornia-housing-api 2>/dev/null || true
           docker run -d --name calfornia-housing-api --restart unless-stopped \
-            -p ${APP_PORT}:8000 "$IMAGE:${{ env.SHA }}"
+            -p ${APP_PORT}:8000 \
+            -v /opt/fastapibe-api/database:/app/database \
+            -v /opt/fastapibe-api/logs:/app/logs \
+            "$IMAGE:${{ env.SHA }}"
 
       - name: Warmup
         run: |
