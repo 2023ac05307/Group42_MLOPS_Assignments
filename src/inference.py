@@ -116,7 +116,6 @@ def predict_price(model, preprocessor, input_df: pd.DataFrame) -> float:
         }
     )
 
-
     transformed_input = preprocessor.transform(input_df)
     prediction = model.predict(transformed_input)
     return prediction[0]
